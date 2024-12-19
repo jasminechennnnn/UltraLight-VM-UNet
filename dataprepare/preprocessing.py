@@ -3,6 +3,7 @@ import h5py
 import numpy as np
 import glob
 import cv2
+import os
 
 # Parameters
 height = 256  # Enter the image size of the model.
@@ -52,6 +53,8 @@ Validation_mask = Label_train_2018[train_number:train_number+val_number]
 Test_mask = Label_train_2018[0:all]
 
 # 儲存資料
+if not os.path.exists("data/"):
+    os.makedirs("data/")
 np.save('data/data_train', Train_img)
 np.save('data/data_test', Test_img)
 np.save('data/data_val', Validation_img)
