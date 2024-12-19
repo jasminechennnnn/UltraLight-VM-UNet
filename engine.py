@@ -148,7 +148,7 @@ def test_one_epoch(test_loader,
             log_info = f'test_datasets_name: {test_data_name}'
             print(log_info)
             logger.info(log_info)
-        log_info = f'test of best model, loss: {np.mean(loss_list):.4f},miou: {miou}, f1_or_dsc: {f1_or_dsc}, accuracy: {accuracy}, \
+        log_info = f'==test of best model==\nloss: {np.mean(loss_list):.4f},miou: {miou}, f1_or_dsc: {f1_or_dsc}, accuracy: {accuracy}, \
                 specificity: {specificity}, sensitivity: {sensitivity}, confusion_matrix: {confusion}'
         print(log_info)
         logger.info(log_info)

@@ -19,7 +19,10 @@ def dataset_normalized(imgs):
     imgs_mean = np.mean(imgs)
     imgs_normalized = (imgs-imgs_mean)/imgs_std
     for i in range(imgs.shape[0]):
-        imgs_normalized[i] = ((imgs_normalized[i] - np.min(imgs_normalized[i])) / (np.max(imgs_normalized[i])-np.min(imgs_normalized[i])))*255
+        imgs_normalized[i] = ((imgs_normalized[i] - np.min(imgs_normalized[i])) / \
+                              (np.max(imgs_normalized[i])-np.min(imgs_normalized[i])))*255
+
+    # imgs_normalized = (imgs - np.min(imgs)) / (np.max(imgs) - np.min(imgs))
     return imgs_normalized
 
 
@@ -30,9 +33,16 @@ class isic_loader(Dataset):
     def __init__(self, path_Data, train = True, Test = False):
         super(isic_loader, self)
         self.train = train
+        print("\nStart reading data from", path_Data)
+
         if train:
-          self.data   = np.load(path_Data+'data_train.npy')
-          self.mask   = np.load(path_Data+'mask_train.npy')
+            self.data   = np.load(path_Data+'data_train.npy')
+            self.mask   = np.load(path_Data+'mask_train.npy')
+            print("Training data statistics:")
+            print(f"Range: {self.data.min():.3f} to {self.data.max():.3f}")
+            print(f"Mean: {self.data.mean():.3f}")
+            print(f"Std: {self.data.std():.3f}")            
+        
         else:
           if Test:
             self.data   = np.load(path_Data+'data_test.npy')
@@ -41,13 +51,23 @@ class isic_loader(Dataset):
             self.data   = np.load(path_Data+'data_val.npy')
             self.mask   = np.load(path_Data+'mask_val.npy')          
         
+        print(f"Mode train = {train}", f"shape = {self.data.shape}")
         self.data   = dataset_normalized(self.data)
+        print(f"Image Range after normalization: {self.data.min():.3f} to {self.data.max():.3f}")
+        
         self.mask   = np.expand_dims(self.mask, axis=3)
         self.mask   = self.mask/255.
+        print(f"Mask Unique values: {np.unique(self.mask)}")
 
     def __getitem__(self, indx):
         img = self.data[indx]
         seg = self.mask[indx]
+
+        if torch.isnan(torch.tensor(img)).any():
+            print(f"NaN found in image {indx}")
+        if torch.isnan(torch.tensor(seg)).any():
+            print(f"NaN found in mask {indx}")
+
         if self.train:
             if random.random() > 0.5:
                 img, seg = self.random_rot_flip(img, seg)

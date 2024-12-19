@@ -1,0 +1,11 @@
+__pycache__/
+data/
+data_isic/
+training/
+testing/
+mask_values.txt
+mask_comparison.txt
+*.png
+results/
+
+
