@@ -1,8 +1,12 @@
 __pycache__/
 data/
 data_isic/
-training/
-testing/
+dataprepare/training/image/
+dataprepare/training/mask/
+!dataprepare/training/training_set.zip
+dataprepare/testing/image/
+dataprepare/testing/mask/
+!dataprepare/testing/testing_set.zip
 mask_values.txt
 mask_comparison.txt
 *.png
