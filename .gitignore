@@ -11,5 +11,4 @@ mask_values.txt
 mask_comparison.txt
 *.png
 results/
-
-
+!results/20241219_1111_UltraLight_VM_UNet_DIP/
