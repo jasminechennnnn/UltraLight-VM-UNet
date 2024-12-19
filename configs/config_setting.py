@@ -1,7 +1,8 @@
 from torchvision import transforms
 from utils import *
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+import pytz
 
 class setting_config:
     """
@@ -46,8 +47,9 @@ class setting_config:
     batch_size = 4
     epochs = 250
 
-    # work_dir = 'results/' + network + '_' + datasets + '_' + datetime.now().strftime('%A_%d_%B_%Y_%Hh_%Mm_%Ss') + '/'
-    work_dir = 'results/' + datetime.now().strftime('%Y%m%d_%H%M') + '_' + network + '_' + datasets + '/'
+    tw = pytz.timezone('Asia/Taipei')
+    current_time = datetime.now(tw)
+    work_dir = 'results/' + current_time.strftime('%Y%m%d_%H%M') + '_' + network + '_' + datasets + '/'
     print_interval = 20
     val_interval = 30
     save_interval = 100
