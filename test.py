@@ -25,7 +25,7 @@ def main(config):
     log_dir = os.path.join(config.work_dir, 'log')
     checkpoint_dir = os.path.join(config.work_dir, 'checkpoints')
     # resume_model = os.path.join('')
-    resume_model = '/home/nycu813/Wall/DIP/UltraLight-VM-UNet/results/20241219_1111_UltraLight_VM_UNet_DIP/checkpoints/best-epoch68-loss1.0049.pth'
+    resume_model = 'results/20241219_1111_UltraLight_VM_UNet_DIP/checkpoints/best-epoch68-loss1.0049.pth'
     outputs = os.path.join(config.work_dir, 'outputs')
     if not os.path.exists(checkpoint_dir):
         os.makedirs(checkpoint_dir)
