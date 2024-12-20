@@ -37,8 +37,11 @@ def main(config):
 
     log_config_info(config, logger)
 
-
-
+    logger.info('='*50)
+    logger.info('Testing Configuration:')
+    logger.info(f'Resume Model Path: {resume_model}')
+    logger.info(f'Testing with checkpoint: best-epoch68-loss1.0049.pth')
+    logger.info('='*50)
 
 
     print('#----------GPU init----------#')
@@ -87,15 +90,18 @@ def main(config):
     print('#----------Testing----------#')
     best_weight = torch.load(resume_model, map_location=torch.device('cpu'))
     model.module.load_state_dict(best_weight)
-    loss = test_one_epoch(
+    threshold_list = [config.threshold]
+    for thresh in threshold_list:
+        print(f"\nTesting with threshold = {thresh}")
+        config.threshold = thresh
+        loss = test_one_epoch(
             test_loader,
             model,
             criterion,
             logger,
             config,
+            visualize=False
         )
-
-
 
 if __name__ == '__main__':
     config = setting_config

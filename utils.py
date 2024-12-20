@@ -11,7 +11,6 @@ import logging
 import logging.handlers
 from matplotlib import pyplot as plt
 
-
 def set_seed(seed):
     # for hash
     os.environ['PYTHONHASHSEED'] = str(seed)
@@ -250,8 +249,78 @@ def save_imgs(img, msk, msk_pred, i, save_path, datasets, threshold=0.5, test_da
         save_path = save_path + test_data_name + '_'
     plt.savefig(save_path + str(i) +'.png')
     plt.close()
-    
 
+def visualize_test_results(img, mask, pred, threshold=0.5, figsize=(15, 5)):
+    """
+    Visualize test results with original image, ground truth mask and prediction.
+    
+    Args:
+        img (torch.Tensor): Input image tensor [C, H, W]
+        mask (numpy.ndarray): Ground truth mask [H, W]
+        pred (numpy.ndarray): Prediction mask [H, W]
+        threshold (float): Threshold for prediction binarization
+        figsize (tuple): Figure size for the plot
+    """
+    # Convert image tensor to numpy array and transpose to [H, W, C]
+    if isinstance(img, torch.Tensor):
+        img = img.cpu().numpy()
+    if img.shape[0] == 3:  # If image is in CHW format
+        img = np.transpose(img, (1, 2, 0))
+    
+    # Normalize image to [0, 1] if needed
+    if img.max() > 1:
+        img = img / 255.
+        
+    # Create binary prediction using threshold
+    pred_binary = (pred >= threshold).astype(float)
+    
+    # Create figure with subplots
+    fig, axes = plt.subplots(1, 4, figsize=figsize)
+    
+    # Plot original image
+    axes[0].imshow(img)
+    axes[0].set_title('Original Image')
+    axes[0].axis('off')
+    
+    # Plot ground truth mask
+    axes[1].imshow(mask, cmap='gray')
+    axes[1].set_title('Ground Truth')
+    axes[1].axis('off')
+    
+    # Plot raw prediction
+    axes[2].imshow(pred, cmap='gray')
+    axes[2].set_title('Raw Prediction')
+    axes[2].axis('off')
+    
+    # Plot thresholded prediction
+    axes[3].imshow(pred_binary, cmap='gray')
+    axes[3].set_title(f'Thresholded Prediction\n(threshold={threshold})')
+    axes[3].axis('off')
+    
+    plt.tight_layout()
+    return fig
+
+def visualize_batch_results(batch_imgs, batch_masks, batch_preds, threshold=0.5, max_images=20):
+    """
+    Visualize results for a batch of images, limited to max_images.
+    
+    Args:
+        batch_imgs (torch.Tensor): Batch of input images [B, C, H, W]
+        batch_masks (numpy.ndarray): Batch of ground truth masks [B, H, W]
+        batch_preds (numpy.ndarray): Batch of prediction masks [B, H, W]
+        threshold (float): Threshold for prediction binarization
+        max_images (int): Maximum number of images to display
+    """
+    batch_size = min(batch_imgs.shape[0], max_images)
+    for i in range(batch_size):
+        fig = visualize_test_results(
+            batch_imgs[i], 
+            batch_masks[i], 
+            batch_preds[i],
+            threshold=threshold
+        )
+        plt.show()
+        plt.close(fig)
 
 class BCELoss(nn.Module):
     def __init__(self):

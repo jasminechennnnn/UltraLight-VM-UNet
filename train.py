@@ -178,6 +178,7 @@ def main(config):
                 criterion,
                 logger,
                 config,
+                visualize=False
             )
         os.rename(
             os.path.join(checkpoint_dir, 'best.pth'),

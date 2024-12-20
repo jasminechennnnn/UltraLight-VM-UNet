@@ -44,8 +44,8 @@ class setting_config:
     world_size = None
     rank = None
     amp = False
-    batch_size = 4
-    epochs = 250
+    batch_size = 8
+    epochs = 200
 
     tw = pytz.timezone('Asia/Taipei')
     current_time = datetime.now(tw)

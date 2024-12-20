@@ -3,7 +3,7 @@ from tqdm import tqdm
 import torch
 from torch.cuda.amp import autocast as autocast
 from sklearn.metrics import confusion_matrix
-from utils import save_imgs
+from utils import save_imgs, visualize_test_results, visualize_batch_results
 
 
 def train_one_epoch(train_loader,
@@ -108,7 +108,8 @@ def test_one_epoch(test_loader,
                     criterion,
                     logger,
                     config,
-                    test_data_name=None):
+                    test_data_name=None,
+                    visualize=True):
     # switch to evaluate mode
     model.eval()
     preds = []
@@ -129,6 +130,9 @@ def test_one_epoch(test_loader,
             preds.append(out) 
             save_imgs(img, msk, out, i, config.work_dir + 'outputs/', config.datasets, config.threshold, test_data_name=test_data_name)
 
+            if visualize:
+                visualize_batch_results(img, msk, out, threshold=config.threshold)
+    
         preds = np.array(preds).reshape(-1)
         gts = np.array(gts).reshape(-1)
 
@@ -148,7 +152,7 @@ def test_one_epoch(test_loader,
             log_info = f'test_datasets_name: {test_data_name}'
             print(log_info)
             logger.info(log_info)
-        log_info = f'==test of best model==\nloss: {np.mean(loss_list):.4f},miou: {miou}, f1_or_dsc: {f1_or_dsc}, accuracy: {accuracy}, \
+        log_info = f'=== test of best model (threshold = {config.threshold})===\nloss: {np.mean(loss_list):.4f},miou: {miou}, f1_or_dsc: {f1_or_dsc}, accuracy: {accuracy}, \
                 specificity: {specificity}, sensitivity: {sensitivity}, confusion_matrix: {confusion}'
         print(log_info)
         logger.info(log_info)
