@@ -33,16 +33,19 @@ pip install scikit-learn matplotlib thop h5py SimpleITK scikit-image medpy yacs 
 ```
 - [causal_conv1d==1.0.0和mamba_ssm==1.0.1安装不了的解决方法](https://blog.csdn.net/weixin_44292425/article/details/136649809)
 
-## 1. Data Preprocessing
+## 1. Clone repo & Prepare data
 1. Unzip the dataset:
 ```bash
+!git clone https://github.com/jasminechennnnn/UltraLight-VM-UNet.git
+
+cd UltraLight-VM-UNet
 chmod +x prepare_data.sh
 ./prepare_data.sh
 ```
 
 2. Preprocess and augment data:
 ```bash
-python preprocessing_aug.py --num-augment <number>  # Replace <number> with desired augmentation count
+python dataprepare/preprocessing_aug.py --num-augment <number>  # Replace <number> with desired augmentation count
 ```
 
 ## 2. Training

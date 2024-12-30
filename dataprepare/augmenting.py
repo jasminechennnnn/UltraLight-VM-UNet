@@ -136,15 +136,14 @@ class ImageSimilarityAnalyzer:
                                  test_images: List[np.ndarray],
                                  test_masks: List[np.ndarray],
                                  top_k: int = 5) -> List[Dict]:
-        print("Analyzing dataset similarities...")
         results = []
         
         train_features = []
-        for img, mask in tqdm(zip(train_images, train_masks), desc="Extracting training features"):
+        for img, mask in tqdm(zip(train_images, train_masks)):
             features = self.extract_features(img, mask)
             train_features.append(features)
         
-        for test_idx, (test_img, test_mask) in enumerate(tqdm(zip(test_images, test_masks), desc="Analyzing test images")):
+        for test_idx, (test_img, test_mask) in enumerate(tqdm(zip(test_images, test_masks))):
             test_features = self.extract_features(test_img, test_mask)
             
             similarities = []
@@ -370,6 +369,10 @@ def process_dataset(images: List[np.ndarray],
     return processed_images, processed_masks
 
 def main():
+    random_seed = 42
+    random.seed(random_seed)
+    np.random.seed(random_seed)
+
     args = parse_arguments()
     height, width = args.image_size
     
@@ -392,6 +395,10 @@ def main():
     print("\nLoading test dataset...")
     test_images, test_masks = load_dataset(test_image_paths, test_mask_paths, (width, height))
 
+    indices = np.arange(len(train_images))
+    np.random.shuffle(indices)
+    train_images = np.array(train_images)[indices]
+    train_masks = np.array(train_masks)[indices]
     train_split = int(len(train_images) * args.train_ratio)
     train_img = train_images[:train_split]
     train_msk = train_masks[:train_split]
