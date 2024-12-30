@@ -29,7 +29,7 @@ pip install triton==2.0.0
 pip install causal_conv1d==1.0.0  # requires: causal_conv1d-1.0.0+cu118torch1.13cxx11abiFALSE-cp38-cp38-linux_x86_64.whl
 pip install mamba_ssm==1.0.1      # requires: mamba_ssm-1.0.1+cu118torch1.13cxx11abiFALSE-cp38-cp38-linux_x86_64.whl
 
-pip install scikit-learn matplotlib thop h5py SimpleITK scikit-image medpy yacs h5py opencv-python scipy pillow albumentations tqdm pytz
+pip install scikit-learn matplotlib thop h5py SimpleITK scikit-image medpy yacs h5py opencv-python scipy pillow albumentations tqdm pytz natsort
 ```
 - [causal_conv1d==1.0.0和mamba_ssm==1.0.1安装不了的解决方法](https://blog.csdn.net/weixin_44292425/article/details/136649809)
 
@@ -45,7 +45,7 @@ chmod +x prepare_data.sh
 
 2. Preprocess and augment data:
 ```bash
-python dataprepare/preprocessing_aug.py --num-augment <number>  # Replace <number> with desired augmentation count
+python dataprepare/aug_mix.py --num-augment <number>  # Replace <number> with desired augmentation count
 ```
 
 ## 2. Training

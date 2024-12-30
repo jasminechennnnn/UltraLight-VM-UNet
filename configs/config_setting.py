@@ -31,7 +31,7 @@ class setting_config:
     else:
         raise Exception('datasets in not right!')
 
-    criterion = BceDiceLoss()
+    criterion = BceDiceLoss(wb=1.15, wd=0.85) # wb, wd
     # criterion = IoULoss()
 
     num_classes = 1
@@ -45,7 +45,7 @@ class setting_config:
     world_size = None
     rank = None
     amp = False
-    batch_size = 16         ########
+    batch_size = 8         ########
     epochs = 200
 
     tw = pytz.timezone('Asia/Taipei')

@@ -24,10 +24,14 @@ def main(config):
     checkpoint_dir = os.path.join(config.work_dir, 'checkpoints')
     resume_model = os.path.join(checkpoint_dir, 'latest.pth')
     outputs = os.path.join(config.work_dir, 'outputs')
+    demo = os.path.join(config.work_dir, 'demo')
     if not os.path.exists(checkpoint_dir):
         os.makedirs(checkpoint_dir)
     if not os.path.exists(outputs):
         os.makedirs(outputs)
+    if not os.path.exists(demo):
+        os.makedirs(demo)
+
 
     global logger
     logger = get_logger('train', log_dir)
@@ -49,12 +53,14 @@ def main(config):
 
     print('#----------Preparing dataset----------#')
     train_dataset = isic_loader(path_Data = config.data_path, train = True, logger = logger)
+    # train_dataset = WaterSegLoader(path_Data = config.data_path, train = True, logger = logger)
     train_loader = DataLoader(train_dataset,
                                 batch_size=config.batch_size, 
                                 shuffle=True,
                                 pin_memory=True,
                                 num_workers=config.num_workers)
     val_dataset = isic_loader(path_Data = config.data_path, train = False, logger = logger)
+    # val_dataset = WaterSegLoader(path_Data = config.data_path, train = False, logger = logger)
     val_loader = DataLoader(val_dataset,
                                 batch_size=1,
                                 shuffle=False,
@@ -62,6 +68,7 @@ def main(config):
                                 num_workers=config.num_workers,
                                 drop_last=True)
     test_dataset = isic_loader(path_Data = config.data_path, train = False, Test = True, logger = logger)
+    # test_dataset = WaterSegLoader(path_Data = config.data_path, train = False, Test = True, logger = logger)
     test_loader = DataLoader(test_dataset,
                                 batch_size=1,
                                 shuffle=False,
@@ -124,6 +131,7 @@ def main(config):
 
 
     print('#----------Training----------#')
+    estop = 0
     for epoch in range(start_epoch, config.epochs + 1):
 
         torch.cuda.empty_cache()
@@ -154,6 +162,9 @@ def main(config):
             torch.save(model.module.state_dict(), os.path.join(checkpoint_dir, 'best.pth'))
             min_loss = loss
             min_epoch = epoch
+            estop = 0
+        else:
+            estop += 1
 
         torch.save(
             {
@@ -167,6 +178,9 @@ def main(config):
             }, os.path.join(checkpoint_dir, 'latest.pth'))
         logger.info(f'Current epoch: {epoch}, Best epoch so far: {min_epoch}')
         print(f'Current epoch: {epoch}, Best epoch so far: {min_epoch}')
+        if estop >= 50:
+            print("Achieved early stop setting = 50, bye bye")
+            break
 
     if os.path.exists(os.path.join(checkpoint_dir, 'best.pth')):
         print('#----------Testing----------#')

@@ -8,6 +8,7 @@ import albumentations as A
 import os
 from typing import List, Tuple, Dict
 from pathlib import Path
+from natsort import natsorted
 from tqdm import tqdm
 from scipy.spatial.distance import cosine
 
@@ -21,6 +22,10 @@ def parse_arguments() -> argparse.Namespace:
                        help='Output directory for processed data (default: data)')
     parser.add_argument('--min-water-ratio', type=float, default=0.2,
                        help='Minimum water ratio threshold (default: 0.2)')
+    parser.add_argument('--shuffle', type=int, default=0,
+                       help='Shuffle before splitting?')
+    parser.add_argument('--con-th', type=float, default=0.75,
+                       help='Conplexity threshold')
     return parser.parse_args()
 
 def load_and_preprocess_image(image_path: str, size: Tuple[int, int]) -> np.ndarray:
@@ -54,6 +59,116 @@ def load_dataset(image_paths: List[str], mask_paths: List[str], size: Tuple[int,
             print(f"Error processing {img_path}: {str(e)}")
             continue
     return images, masks
+
+def analyze_image_complexity(image: np.ndarray, mask: np.ndarray) -> dict:
+    """
+    分析圖片的複雜度
+    
+    Args:
+        image: 輸入圖片 (H, W, C)
+        mask: 遮罩 (H, W)
+        
+    Returns:
+        包含各種複雜度指標的字典
+    """
+    metrics = {}
+    
+    # 1. 計算邊緣複雜度
+    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    edges = cv2.Canny(gray, 100, 200)
+    metrics['edge_density'] = np.mean(edges > 0)
+    
+    # 2. 計算遮罩的邊緣複雜度
+    mask_edges = cv2.Canny((mask > 127).astype(np.uint8) * 255, 100, 200)
+    metrics['mask_edge_density'] = np.mean(mask_edges > 0)
+    
+    # 3. 計算水體區域的形狀複雜度
+    water_region = mask > 127
+    if np.any(water_region):
+        # 計算水體區域的周長與面積比
+        contours, _ = cv2.findContours(water_region.astype(np.uint8), 
+                                     cv2.RETR_EXTERNAL, 
+                                     cv2.CHAIN_APPROX_SIMPLE)
+        area = np.sum(water_region)
+        perimeter = sum(cv2.arcLength(cnt, True) for cnt in contours)
+        metrics['shape_complexity'] = perimeter / (np.sqrt(area) + 1e-6)
+    else:
+        metrics['shape_complexity'] = 0
+        
+    # 4. 計算圖片的清晰度（使用方差作為度量）
+    metrics['sharpness'] = cv2.Laplacian(gray, cv2.CV_64F).var()
+    
+    # 5. 計算圖片的整體對比度
+    metrics['contrast'] = np.std(gray)
+    
+    # 6. 計算雜訊水平（使用高斯差分）
+    blur = cv2.GaussianBlur(gray, (5,5), 0)
+    noise = np.abs(gray.astype(np.float32) - blur.astype(np.float32))
+    metrics['noise_level'] = np.mean(noise)
+    
+    return metrics
+
+def filter_training_data(images: List[np.ndarray], 
+                        masks: List[np.ndarray],
+                        complexity_threshold: float = 0.75) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+    """
+    根據複雜度過濾訓練資料
+    
+    Args:
+        images: 訓練圖片列表
+        masks: 訓練遮罩列表
+        complexity_threshold: 複雜度閾值（百分比）
+        
+    Returns:
+        過濾後的圖片和遮罩列表
+    """
+    print("\nAnalyzing training data complexity...")
+    complexities = []
+    
+    # 計算每張圖片的複雜度指標
+    for img, msk in tqdm(zip(images, masks)):
+        metrics = analyze_image_complexity(img, msk)
+        # 計算綜合複雜度分數
+        complexity_score = (
+            0.3 * metrics['edge_density'] +
+            0.2 * metrics['mask_edge_density'] +
+            0.2 * metrics['shape_complexity'] +
+            0.1 * metrics['noise_level'] +
+            0.1 * metrics['contrast'] +
+            0.1 * metrics['sharpness']
+        )
+        complexities.append(complexity_score)
+    
+    # 計算複雜度閾值
+    threshold = np.percentile(complexities, complexity_threshold * 100)
+    
+    # 過濾資料
+    filtered_data = [(img, msk, score) for img, msk, score 
+                     in zip(images, masks, complexities) 
+                     if score <= threshold]
+    
+    # 分離圖片和遮罩
+    filtered_images = [data[0] for data in filtered_data]
+    filtered_masks = [data[1] for data in filtered_data]
+    
+    # 輸出統計信息
+    print(f"\nFiltering results:")
+    print(f"Original data count: {len(images)}")
+    print(f"Filtered data count: {len(filtered_images)}")
+    print(f"Removed {len(images) - len(filtered_images)} complex samples")
+    
+    # 可視化一些統計信息
+    # plt.figure(figsize=(10, 5))
+    # plt.hist(complexities, bins=50, alpha=0.75)
+    # plt.axvline(threshold, color='r', linestyle='--', label='Threshold')
+    # plt.title('Distribution of Image Complexity Scores')
+    # plt.xlabel('Complexity Score')
+    # plt.ylabel('Count')
+    # plt.legend()
+    # plt.savefig('complexity_distribution.png')
+    # plt.close()
+    
+    return filtered_images, filtered_masks
 
 class ImageSimilarityAnalyzer:
     
@@ -385,20 +500,24 @@ def main():
     args.output_dir = os.path.join(script_dir, args.output_dir)
     print(f"Output directory: {args.output_dir}")
     
-    train_image_paths = sorted(glob.glob(os.path.join(script_dir, "training/image/*.png")))
-    train_mask_paths = sorted(glob.glob(os.path.join(script_dir, "training/mask/*.png")))
-    test_image_paths = sorted(glob.glob(os.path.join(script_dir, "testing/image/*.[jJ][pP][gG]")))
-    test_mask_paths = sorted(glob.glob(os.path.join(script_dir, "testing/mask/*.png")))
+    train_image_paths = natsorted(glob.glob(os.path.join(script_dir, "training/image/*.png")))
+    train_mask_paths = natsorted(glob.glob(os.path.join(script_dir, "training/mask/*.png")))
+    test_image_paths = natsorted(glob.glob(os.path.join(script_dir, "testing/image/*.[jJ][pP][gG]")))
+    test_mask_paths = natsorted(glob.glob(os.path.join(script_dir, "testing/mask/*.png")))
     
     print("\nLoading training dataset...")
     train_images, train_masks = load_dataset(train_image_paths, train_mask_paths, (width, height))
     print("\nLoading test dataset...")
     test_images, test_masks = load_dataset(test_image_paths, test_mask_paths, (width, height))
 
-    indices = np.arange(len(train_images))
-    np.random.shuffle(indices)
-    train_images = np.array(train_images)[indices]
-    train_masks = np.array(train_masks)[indices]
+    train_images, train_masks = filter_training_data(train_images, train_masks, 
+                                               complexity_threshold=args.con_th)
+
+    if args.shuffle == 1:
+        indices = np.arange(len(train_images))
+        np.random.shuffle(indices)
+        train_images = np.array(train_images)[indices]
+        train_masks = np.array(train_masks)[indices]
     train_split = int(len(train_images) * args.train_ratio)
     train_img = train_images[:train_split]
     train_msk = train_masks[:train_split]

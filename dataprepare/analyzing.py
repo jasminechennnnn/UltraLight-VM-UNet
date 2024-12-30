@@ -126,7 +126,7 @@ class Visualizer:
             List of selected sample indices
         """
         random.seed(42)
-        indices = random.sample(range(len(data)), n_samples)
+        indices = random.sample(range(len(data)), min(len(data), n_samples))
         
         fig, axes = plt.subplots(4, 8, figsize=(28, 14))
         for i, idx in enumerate(indices):

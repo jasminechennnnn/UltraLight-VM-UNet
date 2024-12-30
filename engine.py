@@ -3,8 +3,9 @@ from tqdm import tqdm
 import torch
 from torch.cuda.amp import autocast as autocast
 from sklearn.metrics import confusion_matrix
-from utils import save_imgs, visualize_test_results, visualize_batch_results
+from utils import save_imgs, visualize_test_results, visualize_batch_results, calculate_iou, analyze_performance_distribution
 import os
+import glob
 
 def train_one_epoch(train_loader,
                     model,
@@ -112,9 +113,11 @@ def test_one_epoch(test_loader,
                     visualize=True):
     # switch to evaluate mode
     model.eval()
+    performance_dict = {}
     preds = []
     gts = []
     loss_list = []
+    test_mask_paths = sorted(glob.glob("dataprepare/testing/mask/*.png"))
     with torch.no_grad():
         for i, data in enumerate(tqdm(test_loader)):
             img, msk = data
@@ -128,11 +131,26 @@ def test_one_epoch(test_loader,
                 out = out[0]
             out = out.squeeze(1).cpu().detach().numpy()
             preds.append(out) 
-            save_imgs(img, msk, out, i, os.path.join(config.work_dir, 'outputs'), config.datasets, config.threshold, test_data_name=test_data_name)
+
+            binary_mask = np.where(msk > 0.5, 1, 0)
+            binary_pred = np.where(out > config.threshold, 1, 0)
+            water_ratio = np.mean(binary_mask)
+            iou = calculate_iou(binary_mask, binary_pred)
+            
+            # 將結果存入字典
+            performance_dict[i] = {
+                'water_ratio': water_ratio,
+                'iou': iou
+            }
+
+            save_imgs(img, msk, out, i+1, config.work_dir,
+                      config.datasets, config.threshold, test_data_name=test_data_name,
+                      orig_img_path=test_mask_paths[i])
 
             if visualize:
                 visualize_batch_results(img, msk, out, threshold=config.threshold)
-    
+
+        analyze_performance_distribution(performance_dict, config.work_dir + '/demo')
         preds = np.array(preds).reshape(-1)
         gts = np.array(gts).reshape(-1)
 

@@ -8,6 +8,7 @@ import cv2
 from scipy import ndimage
 import random
 from PIL import Image
+from natsort import natsorted
 import albumentations as A
 import os
 from typing import List, Tuple, Dict
@@ -18,7 +19,7 @@ def parse_arguments() -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description='Preprocess and augment image dataset')
     parser.add_argument('--method', type=str, default='mild',
-                       help='intensity of aug, {mild} or {strong}')
+                       help='intensity of aug, {mild} or {strong} or mix')
     parser.add_argument('--num', type=int, default=5,
                        help='Number of augmentations per image (default: 5)')
     parser.add_argument('--image-size', type=int, nargs=2, default=[256, 256],
@@ -28,7 +29,24 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument('--output-dir', type=str, default='data/',
                        help='Output directory for processed data (default: data)')
     return parser.parse_args()
-
+    """Extract all features from an image."""
+    # Normalize RGB to 0-1 range
+    img_normalized = img.astype(np.float64) / 255.0
+    
+    # Extract additional features
+    freq_features = extract_frequency_features(img)
+    ndwi_feature = calculate_ndwi(img)
+    # texture_features = calculate_texture_features(img)
+    
+    # Concatenate all features
+    all_features = np.concatenate([
+        img_normalized,    # RGB (3 channels)
+        freq_features,     # Frequency domain (2 channels)
+        ndwi_feature,      # NDWI (1 channel)
+        # texture_features   # Texture (4 channels)
+    ], axis=-1)
+    
+    return all_features
 
 #### version 1: mild
 def create_augmentations_mild() -> A.Compose:
@@ -60,7 +78,6 @@ def create_augmentations_mild() -> A.Compose:
             A.ElasticTransform(
                 alpha=50,            # 從150降低到50
                 sigma=5,             # 從10降低到5
-                alpha_affine=5,      # 從10降低到5
                 p=1.0
             ),
         ], p=0.2),                  # 從0.4降低到0.2
@@ -114,7 +131,6 @@ def create_augmentations_strong() -> A.Compose:
             A.ElasticTransform(
                 alpha=150,         # 較大的形變幅度
                 sigma=10,          # 控制形變的平滑度
-                alpha_affine=10,   # 整體形變程度
                 p=1.0
             ),  # 模擬流動的水面
         ], p=0.4),
@@ -194,7 +210,7 @@ def load_and_preprocess_mask(mask_path: str, size: Tuple[int, int]) -> np.ndarra
     return mask
 
 def process_dataset(image_list: List[str], mask_list: List[str], 
-                   size: Tuple[int, int], transform: A.Compose, 
+                   size: Tuple[int, int], transform: A.Compose = None, 
                    num_augment: int = 0, is_training: bool = False) -> Tuple[np.ndarray, np.ndarray]:
     """Process a dataset (training/validation/testing)."""
     num_images = len(image_list)
@@ -225,12 +241,60 @@ def process_dataset(image_list: List[str], mask_list: List[str],
     
     return data, labels
 
+def get_augmentation_params(mask_ratio: float) -> Tuple[int, A.Compose]:
+    if mask_ratio >= 0.4:
+        num_aug = 3
+        transform = create_augmentations_strong()
+    elif 0.2 <= mask_ratio < 0.4:
+        num_aug = 7
+        transform = create_augmentations_mild()
+    else:
+        num_aug = 5
+        transform = A.Compose([
+            A.RandomRotate90(p=0.5),
+            A.Flip(p=0.5),
+            A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.1, rotate_limit=30, p=0.5),
+        ])
+        
+    return num_aug, transform
+
+def process_dataset_mix(image_list: List[str], mask_list: List[str], 
+                   size: Tuple[int, int], is_training: bool = False) -> Tuple[np.ndarray, np.ndarray]:
+    """Process a dataset (training/validation/testing)."""
+    num_images = len(image_list)
+    height, width = size
+    
+    processed_images = []
+    processed_masks = []
+    
+    desc = "Processing training set" if is_training else "Processing validation/test set"
+    for _, (img_path, mask_path) in tqdm(enumerate(zip(image_list, mask_list)), 
+                                        total=num_images, desc=desc):
+        
+        img = load_and_preprocess_image(img_path, (width, height))
+        mask = load_and_preprocess_mask(mask_path, (width, height))
+        
+        if is_training:
+            mask_ratio = np.mean(mask) / 255
+            num_augment, transform = get_augmentation_params(mask_ratio)
+            print(num_augment, end=' ')
+            aug_images, aug_masks = augment_image(img, mask, transform, num_augment)
+            for aug_img, aug_mask in zip(aug_images, aug_masks):
+                processed_images.append(aug_img.astype(np.float64))
+                processed_masks.append(aug_mask.astype(np.float64))
+        else:
+            processed_images.append(img.astype(np.float64))
+            processed_masks.append(mask.astype(np.float64))
+    
+    return np.array(processed_images), np.array(processed_masks)
+
 def main():
     """Main function."""
     args = parse_arguments()
     height, width = args.image_size
     
     print("\n=== Processing Parameters ===")
+    print(f'Method: {args.method}')
     print(f"Image size: {width}x{height}")
     print(f"Augmentations per image: {args.num}")
     print(f"Train/Val split ratio: {args.train_ratio:.2f}/{1-args.train_ratio:.2f}")
@@ -240,10 +304,10 @@ def main():
     print(f"Output directory: {args.output_dir}")
     
     # Prepare data paths
-    tr_list = sorted(glob.glob(f"{script_dir}/training/image/*.png"))
-    ms_list = sorted(glob.glob(f"{script_dir}/training/mask/*.png"))
-    test_list = sorted(glob.glob(f"{script_dir}/testing/image/*.[jJ][pP][gG]"))
-    test_mask_list = sorted(glob.glob(f"{script_dir}/testing/mask/*.png"))
+    tr_list = natsorted(glob.glob(f"{script_dir}/training/image/*.png"))
+    ms_list = natsorted(glob.glob(f"{script_dir}/training/mask/*.png"))
+    test_list = natsorted(glob.glob(f"{script_dir}/testing/image/*.[jJ][pP][gG]"))
+    test_mask_list = natsorted(glob.glob(f"{script_dir}/testing/mask/*.png"))
     
     print("\n=== Dataset Statistics ===")
     print(f"Total training images found: {len(tr_list)}")
@@ -262,29 +326,34 @@ def main():
     print(f"Expected augmented training images: {len(train_images) * (args.num + 1)}")
 
     # Create augmentation transform
-    if args.method == 'mild':
-        transform = create_augmentations_mild()
-    elif args.method == 'strong':
-        transform = create_augmentations_strong()
-    
     # Process datasets
-    print(f'\nProcessing training set with {args.num} augmentations per image...')
-    data_train, mask_train = process_dataset(
-        train_images, train_masks, 
-        (height, width), transform, 
-        args.num, is_training=True
-    )
-    
+    if args.method == 'mild' or args.method == 'strong':
+        transform = create_augmentations_mild()
+        transform = create_augmentations_strong()
+        print(f'\nProcessing training set with {args.num} augmentations per image...')
+        data_train, mask_train = process_dataset(
+            train_images, train_masks, 
+            (height, width), transform, 
+            args.num, is_training=True
+        )
+
+    elif args.method == 'mix':
+        print(f'\nProcessing training set with mix augmentations...')
+        data_train, mask_train = process_dataset_mix(
+            train_images, train_masks, 
+            (height, width), is_training=True
+        )
+
     print('\nProcessing validation set...')
     data_val, mask_val = process_dataset(
         val_images, val_masks, 
-        (height, width), transform
+        (height, width)
     )
     
     print('\nProcessing test set...')
     data_test, mask_test = process_dataset(
         test_list, test_mask_list, 
-        (height, width), transform
+        (height, width)
     )
     
     # Save results

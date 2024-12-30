@@ -10,6 +10,10 @@ import random
 import logging
 import logging.handlers
 from matplotlib import pyplot as plt
+import cv2
+from typing import List, Tuple, Dict
+from pathlib import Path
+
 
 def set_seed(seed):
     # for hash
@@ -221,8 +225,10 @@ def get_scheduler(config, optimizer):
 
 
 
-def save_imgs(img, msk, msk_pred, i, save_path, datasets, threshold=0.5, test_data_name=None):
+def save_imgs(img, msk, msk_pred, i, save_path, datasets, threshold=0.5,
+              test_data_name=None, orig_img_path=None):
     img = img.squeeze(0).permute(1,2,0).detach().cpu().numpy()
+    img = img[:, :, :3]  # 取前三個通道 (RGB)
     img = img / 255. if img.max() > 1.1 else img
     if datasets == 'retinal':
         msk = np.squeeze(msk, axis=0)
@@ -231,6 +237,22 @@ def save_imgs(img, msk, msk_pred, i, save_path, datasets, threshold=0.5, test_da
         msk = np.where(np.squeeze(msk, axis=0) > 0.5, 1, 0)
         msk_pred = np.where(np.squeeze(msk_pred, axis=0) > threshold, 1, 0) 
 
+    if orig_img_path:
+        orig_img = cv2.imread(orig_img_path)
+        orig_h, orig_w = orig_img.shape[:2]
+
+        msk_pred_resized = cv2.resize(msk_pred.astype(np.float32), 
+                                    (orig_w, orig_h), 
+                                    interpolation=cv2.INTER_NEAREST)
+        
+        pred_save_path = os.path.join(save_path + '/outputs', f'{i}.png')
+        cv2.imwrite(pred_save_path, (msk_pred_resized * 255).astype(np.uint8))
+        # print(f"Original size prediction saved to: {pred_save_path}")
+
+        # msk_resized = cv2.resize(msk.astype(np.float32), 
+        #                        (orig_w, orig_h), 
+        #                        interpolation=cv2.INTER_NEAREST)
+        
     plt.figure(figsize=(7,15))
 
     plt.subplot(3,1,1)
@@ -247,7 +269,7 @@ def save_imgs(img, msk, msk_pred, i, save_path, datasets, threshold=0.5, test_da
 
     if test_data_name is not None:
         save_path = save_path + test_data_name + '_'
-    plt.savefig(save_path + '/' + str(i) +'.png')
+    plt.savefig(save_path + '/demo/demo_' + str(i) +'.png')
     plt.close()
 
     # print(f"{save_path + '/' + str(i) +'.png'} saved!")
@@ -324,6 +346,78 @@ def visualize_batch_results(batch_imgs, batch_masks, batch_preds, threshold=0.5,
         plt.show()
         plt.close(fig)
 
+def calculate_iou(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """Calculate IoU score for binary masks."""
+    intersection = np.logical_and(y_true, y_pred).sum()
+    union = np.logical_or(y_true, y_pred).sum()
+    return intersection / union if union != 0 else 0.0
+
+def analyze_performance_distribution(performance_dict, save_path):
+    """分析並繪製水體比例與性能的關係。"""
+    # 提取數據
+    indices = list(performance_dict.keys())
+    water_ratios = [data['water_ratio'] * 100 for data in performance_dict.values()]
+    ious = [data['iou'] for data in performance_dict.values()]
+
+    # 創建分組
+    num_bins = 10
+    bins = np.linspace(0, 100, num_bins+1)
+    bin_centers = (bins[:-1] + bins[1:]) / 2
+    
+    # 計算每個分組的統計信息
+    bin_indices = np.digitize(water_ratios, bins) - 1
+    avg_ious = []
+    std_ious = []
+    sample_counts = []
+    
+    for i in range(num_bins):
+        bin_mask = (bin_indices == i)
+        bin_ious = [iou for iou, mask in zip(ious, bin_mask) if mask]
+        avg_ious.append(np.mean(bin_ious) if len(bin_ious) > 0 else 0)
+        std_ious.append(np.std(bin_ious) if len(bin_ious) > 0 else 0)
+        sample_counts.append(np.sum(bin_mask))
+
+    # 繪製分析圖
+    plt.figure(figsize=(15, 3))
+    
+    best_idx = max(performance_dict.items(), key=lambda x: x[1]['iou'])[0]
+    worst_idx = min(performance_dict.items(), key=lambda x: x[1]['iou'])[0]
+    # 散點圖和平均值線
+    plt.subplot(1, 1, 1)
+    plt.scatter(water_ratios, ious, alpha=0.5, c='blue', label='Individual Samples')
+    plt.plot(bin_centers, avg_ious, 'r-', linewidth=2, label='Average IoU')
+    plt.fill_between(bin_centers, 
+                    np.array(avg_ious) - np.array(std_ious),
+                    np.array(avg_ious) + np.array(std_ious),
+                    alpha=0.2, color='red')
+    plt.ylim((0, 1))
+    plt.xlabel('Water Coverage Ratio (%)')
+    plt.ylabel('IoU Score')
+    plt.title(f'IoU Score vs Water Coverage Ratio\nbest={best_idx+1}.png, worst={worst_idx+1}.png')
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+    
+    # 樣本分布圖
+    # plt.subplot(2, 1, 2)
+    # plt.bar(bin_centers, sample_counts, width=(100/num_bins)*0.8)
+    # plt.xlabel('Water Coverage Ratio (%)')
+    # plt.ylabel('Number of Samples')
+    # plt.title('Distribution of Water Coverage Ratios')
+    # plt.grid(True, alpha=0.3)
+    
+    # 添加統計信息
+    plt.figtext(0.2, 0.6, 
+                f'Total Samples: {len(ious)}\n'
+                f'Average IoU: {np.mean(ious):.3f}\n'
+                f'Std IoU: {np.std(ious):.3f}\n'
+                f'Max IoU: {np.max(ious):.3f}\n'
+                f'Min IoU: {np.min(ious):.3f}',
+                bbox=dict(facecolor='white', alpha=0.5))
+    
+    plt.tight_layout()
+    plt.savefig(os.path.join(save_path, 'water_ratio_analysis.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+
 class BCELoss(nn.Module):
     def __init__(self):
         super(BCELoss, self).__init__()
@@ -335,7 +429,6 @@ class BCELoss(nn.Module):
         target_ = target.view(size, -1)
 
         return self.bceloss(pred_, target_)
-
 
 class DiceLoss(nn.Module):
     def __init__(self):
@@ -400,5 +493,3 @@ def cal_params_flops(model, size, logger):
     total = sum(p.numel() for p in model.parameters())
     print("Total params: %.3fM" % (total/1e6))
     logger.info(f'flops: {flops/1e9}, params: {params/1e6}, Total params: : {total/1e6:.4f}')
-        
-        

@@ -21,8 +21,10 @@ warnings.filterwarnings("ignore")
 def main(config):
 
     print('#----------Creating logger----------#')
-    # resume_model = 'results/20241230_083403_UltraLight_VM_UNet_DIP/checkpoints/best.pth' # 16, 0.5
-    resume_model = 'results/20241230_095745_UltraLight_VM_UNet_DIP/checkpoints/best.pth'
+    resume_model = 'results/20241230_143745_UltraLight_VM_UNet_DIP/checkpoints/best-epoch80-loss0.3487.pth' # case 1
+    # resume_model = 'results/20241230_172541_UltraLight_VM_UNet_DIP/checkpoints/best-epoch86-loss0.8725.pth' # case 2
+    # resume_model = 'results/20241230_181723_UltraLight_VM_UNet_DIP/checkpoints/best-epoch110-loss1.1885.pth' # case 3
+    
     config.work_dir = os.path.dirname(os.path.dirname(resume_model))
     sys.path.append(config.work_dir + '/')
     log_dir = os.path.join(config.work_dir, 'log')
@@ -30,11 +32,15 @@ def main(config):
     # resume_model = os.path.join('')
     outputs = os.path.join(config.work_dir, 'outputs')
     print(f"output path: {outputs}\n")
+    demo = os.path.join(config.work_dir, 'demo')
+    print(f"demo path: {demo}\n")
     
     # if not os.path.exists(checkpoint_dir):
     #     os.makedirs(checkpoint_dir)
     if not os.path.exists(outputs):
         os.makedirs(outputs)
+    if not os.path.exists(demo):
+        os.makedirs(demo)
 
     global logger
     logger = get_logger('test', log_dir)
@@ -68,6 +74,7 @@ def main(config):
 
     print('#----------Preparing dataset----------#')
     test_dataset = isic_loader(path_Data = config.data_path, train = False, Test = True)
+    # test_dataset = WaterSegLoader(path_Data = config.data_path, train = False, Test = True, logger = logger)
     test_loader = DataLoader(test_dataset,
                                 batch_size=1,
                                 shuffle=False,
