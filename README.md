@@ -18,7 +18,7 @@ The environment can be set up following [VM-UNet](https://github.com/JCruan519/V
 ```bash
 conda create -n vmunet python=3.8
 conda activate vmunet
-pip install torch==1.13.0 torchvision==0.14.0 torchaudio==0.13.0 --extra-index-url https://download.pytorch.org/whl/cu117
+pip install torch==1.13.0 torchvision==0.14.0 torchaudio==0.13.0 --extra-index-url https://download.pytorch.org/whl/cu118
 pip install packaging
 pip install timm==0.4.12
 pip install pytest chardet yacs termcolor
@@ -29,8 +29,9 @@ pip install triton==2.0.0
 pip install causal_conv1d==1.0.0  # requires: causal_conv1d-1.0.0+cu118torch1.13cxx11abiFALSE-cp38-cp38-linux_x86_64.whl
 pip install mamba_ssm==1.0.1      # requires: mamba_ssm-1.0.1+cu118torch1.13cxx11abiFALSE-cp38-cp38-linux_x86_64.whl
 
-pip install scikit-learn matplotlib thop h5py SimpleITK scikit-image medpy yacs h5py opencv-python scipy pillow albumentations tqdm
+pip install scikit-learn matplotlib thop h5py SimpleITK scikit-image medpy yacs h5py opencv-python scipy pillow albumentations tqdm pytz
 ```
+- [causal_conv1d==1.0.0和mamba_ssm==1.0.1安装不了的解决方法](https://blog.csdn.net/weixin_44292425/article/details/136649809)
 
 ## 1. Data Preprocessing
 1. Unzip the dataset:
@@ -41,9 +42,7 @@ chmod +x prepare_data.sh
 
 2. Preprocess and augment data:
 ```bash
-cd dataprepare/
 python preprocessing_aug.py --num-augment <number>  # Replace <number> with desired augmentation count
-cd ../
 ```
 
 ## 2. Training

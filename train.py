@@ -16,7 +16,6 @@ from configs.config_setting import setting_config
 import warnings
 warnings.filterwarnings("ignore")
 
-
 def main(config):
 
     print('#----------Creating logger----------#')
@@ -49,20 +48,20 @@ def main(config):
 
 
     print('#----------Preparing dataset----------#')
-    train_dataset = isic_loader(path_Data = config.data_path, train = True)
+    train_dataset = isic_loader(path_Data = config.data_path, train = True, logger = logger)
     train_loader = DataLoader(train_dataset,
                                 batch_size=config.batch_size, 
                                 shuffle=True,
                                 pin_memory=True,
                                 num_workers=config.num_workers)
-    val_dataset = isic_loader(path_Data = config.data_path, train = False)
+    val_dataset = isic_loader(path_Data = config.data_path, train = False, logger = logger)
     val_loader = DataLoader(val_dataset,
                                 batch_size=1,
                                 shuffle=False,
                                 pin_memory=True, 
                                 num_workers=config.num_workers,
                                 drop_last=True)
-    test_dataset = isic_loader(path_Data = config.data_path, train = False, Test = True)
+    test_dataset = isic_loader(path_Data = config.data_path, train = False, Test = True, logger = logger)
     test_loader = DataLoader(test_dataset,
                                 batch_size=1,
                                 shuffle=False,
@@ -165,9 +164,10 @@ def main(config):
                 'model_state_dict': model.module.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'scheduler_state_dict': scheduler.state_dict(),
-            }, os.path.join(checkpoint_dir, 'latest.pth')) 
+            }, os.path.join(checkpoint_dir, 'latest.pth'))
+        logger.info(f'Current epoch: {epoch}, Best epoch so far: {min_epoch}')
         print(f'Current epoch: {epoch}, Best epoch so far: {min_epoch}')
-        
+
     if os.path.exists(os.path.join(checkpoint_dir, 'best.pth')):
         print('#----------Testing----------#')
         best_weight = torch.load(config.work_dir + 'checkpoints/best.pth', map_location=torch.device('cpu'))

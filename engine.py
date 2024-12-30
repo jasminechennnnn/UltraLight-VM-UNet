@@ -4,7 +4,7 @@ import torch
 from torch.cuda.amp import autocast as autocast
 from sklearn.metrics import confusion_matrix
 from utils import save_imgs, visualize_test_results, visualize_batch_results
-
+import os
 
 def train_one_epoch(train_loader,
                     model,
@@ -128,7 +128,7 @@ def test_one_epoch(test_loader,
                 out = out[0]
             out = out.squeeze(1).cpu().detach().numpy()
             preds.append(out) 
-            save_imgs(img, msk, out, i, config.work_dir + 'outputs/', config.datasets, config.threshold, test_data_name=test_data_name)
+            save_imgs(img, msk, out, i, os.path.join(config.work_dir, 'outputs'), config.datasets, config.threshold, test_data_name=test_data_name)
 
             if visualize:
                 visualize_batch_results(img, msk, out, threshold=config.threshold)
@@ -152,6 +152,8 @@ def test_one_epoch(test_loader,
             log_info = f'test_datasets_name: {test_data_name}'
             print(log_info)
             logger.info(log_info)
+        logger.info('loss list: ')
+        logger.info(loss_list)
         log_info = f'=== test of best model (threshold = {config.threshold})===\nloss: {np.mean(loss_list):.4f},miou: {miou}, f1_or_dsc: {f1_or_dsc}, accuracy: {accuracy}, \
                 specificity: {specificity}, sensitivity: {sensitivity}, confusion_matrix: {confusion}'
         print(log_info)

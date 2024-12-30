@@ -6,6 +6,7 @@ import random
 import cv2
 from typing import Dict, List, Set, Tuple, Union
 from pathlib import Path
+import os
 
 class ImageStats:
     """Class for handling image statistics calculations and visualization"""
@@ -65,7 +66,6 @@ class ImageStats:
 
 class Visualizer:
     """Class for handling data visualization tasks"""
-    
     @staticmethod
     def plot_statistics(stats: Dict, dataset_name: str, save_path: str) -> None:
         """
@@ -125,13 +125,13 @@ class Visualizer:
         Returns:
             List of selected sample indices
         """
+        random.seed(42)
         indices = random.sample(range(len(data)), n_samples)
         
         fig, axes = plt.subplots(4, 8, figsize=(28, 14))
         for i, idx in enumerate(indices):
             row = i // 4
             col = (i % 4) * 2
-            
             axes[row, col].imshow(data[idx].astype(np.uint8))
             axes[row, col].set_title(f'{dataset_name} Image {idx}')
             axes[row, col].axis('off')
@@ -145,6 +145,100 @@ class Visualizer:
         plt.close()
         
         return indices
+    
+    @staticmethod
+    def plot_water_ratio_distribution(train_stats: Dict, val_stats: Dict, 
+                                    test_stats: Dict, save_path: str, plot_type: str='bar') -> None:
+        """
+        Plot water ratio distribution comparison for train, validation and test sets
+        
+        Args:
+            train_stats: Dictionary containing training set statistics
+            val_stats: Dictionary containing validation set statistics
+            test_stats: Dictionary containing test set statistics
+            save_path: Path to save the visualization
+        """
+        plt.figure(figsize=(12, 6))
+        
+        if plot_type == 'hist':
+            # Simple overlapping histograms
+            plt.hist(train_stats['mask_ratio'], bins=30, alpha=0.5, label='Train', 
+                    range=(0, 1), density=True)
+            plt.hist(val_stats['mask_ratio'], bins=30, alpha=0.5, label='Validation',
+                    range=(0, 1), density=True)
+            plt.hist(test_stats['mask_ratio'], bins=30, alpha=0.5, label='Test',
+                    range=(0, 1), density=True)
+            
+        elif plot_type == 'histdensity':
+            # Histogram with density curve
+            sns.histplot(data=train_stats['mask_ratio'], bins=30, alpha=0.3, 
+                        label='Train', stat='density', element='step')
+            sns.histplot(data=val_stats['mask_ratio'], bins=30, alpha=0.3,
+                        label='Validation', stat='density', element='step')
+            sns.histplot(data=test_stats['mask_ratio'], bins=30, alpha=0.3,
+                        label='Test', stat='density', element='step')
+            
+        elif plot_type == 'bar':
+            # Side-by-side bars
+            bins = np.linspace(0, 1, 11)  # 10 bins from 0 to 1
+            width = (bins[1] - bins[0]) / 4  # Adjust bar width
+            
+            # Calculate histograms
+            train_hist, _ = np.histogram(train_stats['mask_ratio'], bins=bins, density=True)
+            val_hist, _ = np.histogram(val_stats['mask_ratio'], bins=bins, density=True)
+            test_hist, _ = np.histogram(test_stats['mask_ratio'], bins=bins, density=True)
+            
+            # Plot bars side by side
+            bin_centers = (bins[:-1] + bins[1:]) / 2
+            plt.bar(bin_centers - width, train_hist, width, alpha=0.7, label='Train')
+            plt.bar(bin_centers, val_hist, width, alpha=0.7, label='Validation')
+            plt.bar(bin_centers + width, test_hist, width, alpha=0.7, label='Test')
+
+        plt.xticks(np.linspace(0, 1, 11))
+        
+        plt.title('Water Ratio Distribution Comparison')
+        plt.xlabel('Water Ratio')
+        plt.ylabel('Density')
+        plt.legend()
+        
+        plt.tight_layout()
+        plt.savefig(save_path)
+        plt.close()
+
+    @staticmethod
+    def plot_channel_distributions(train_data: np.ndarray, val_data: np.ndarray, 
+                                 test_data: np.ndarray, save_path: str) -> None:
+        """
+        Plot pixel value distributions for each channel across train, validation and test sets
+        
+        Args:
+            train_data: Training set image data
+            val_data: Validation set image data
+            test_data: Test set image data
+            save_path: Path to save the visualization
+        """
+        fig, axes = plt.subplots(3, 1, figsize=(12, 15))
+        channel_names = ['Red', 'Green', 'Blue']
+        
+        for channel in range(3):
+            # Flatten the data for each channel
+            train_channel = train_data[:, :, :, channel].flatten()
+            val_channel = val_data[:, :, :, channel].flatten()
+            test_channel = test_data[:, :, :, channel].flatten()
+            
+            # Create distribution plots using kernel density estimation
+            sns.kdeplot(data=train_channel, label='Train', alpha=0.6, ax=axes[channel])
+            sns.kdeplot(data=val_channel, label='Validation', alpha=0.6, ax=axes[channel])
+            sns.kdeplot(data=test_channel, label='Test', alpha=0.6, ax=axes[channel])
+            
+            axes[channel].set_title(f'{channel_names[channel]} Channel Distribution')
+            axes[channel].set_xlabel('Pixel Value')
+            axes[channel].set_ylabel('Density')
+            axes[channel].legend()
+        
+        plt.tight_layout()
+        plt.savefig(save_path)
+        plt.close()
 
 class DataAnalyzer:
     """Class for analyzing and comparing mask data"""
@@ -212,22 +306,23 @@ class DataAnalyzer:
 def main():
     """Main function to run the analysis"""
     # Load data
-    data_dir = Path('data')
-    train_data = np.load(data_dir / 'data_train.npy')
-    train_masks = np.load(data_dir / 'mask_train.npy')
-    val_data = np.load(data_dir / 'data_val.npy')
-    val_masks = np.load(data_dir / 'mask_val.npy')
-    test_data = np.load(data_dir / 'data_test.npy')
-    test_masks = np.load(data_dir / 'mask_test.npy')
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    data_dir = os.path.join(script_dir, 'data')
+    train_data = np.load(data_dir + '/data_train.npy')
+    train_masks = np.load(data_dir + '/mask_train.npy')
+    val_data = np.load(data_dir + '/data_val.npy')
+    val_masks = np.load(data_dir + '/mask_val.npy')
+    test_data = np.load(data_dir + '/data_test.npy')
+    test_masks = np.load(data_dir + '/mask_test.npy')
     
     print(f'Train masks shape: {train_masks.shape}')
     
     # Compare original and processed masks
-    DataAnalyzer.compare_masks(
-        'training/mask/1.png',
-        train_masks[0],
-        'mask_comparison.txt'
-    )
+    # DataAnalyzer.compare_masks(
+    #     os.path.join(script_dir, 'training/mask/1.png'),
+    #     train_masks[0],
+    #     'mask_comparison.txt'
+    # )
     
     # Calculate statistics
     train_stats = ImageStats.calculate_dataset_stats(train_data, train_masks)
@@ -235,13 +330,25 @@ def main():
     test_stats = ImageStats.calculate_dataset_stats(test_data, test_masks)
     
     # Create visualizations
-    Visualizer.plot_statistics(train_stats, "Training", "statistics_train.png")
-    Visualizer.plot_statistics(val_stats, "Validation", "statistics_validation.png")
+    # Visualizer.plot_statistics(train_stats, "Training", os.path.join(script_dir, "statistics_train.png"))
+    # Visualizer.plot_statistics(val_stats, "Validation", os.path.join(script_dir, "statistics_validation.png"))
     
     train_indices = Visualizer.visualize_samples(
-        train_data, train_masks, 16, "Train", "sample_train.png")
+        train_data, train_masks, 16, "Train", os.path.join(script_dir, "sample_train.png"))
     val_indices = Visualizer.visualize_samples(
-        val_data, val_masks, 16, "Val", "sample_validation.png")
+        val_data, val_masks, 16, "Val", os.path.join(script_dir, "sample_validation.png"))
+    test_indices = Visualizer.visualize_samples(
+        test_data, test_masks, 16, "Test", os.path.join(script_dir, "sample_test.png"))
+    
+    Visualizer.plot_water_ratio_distribution(
+        train_stats, val_stats, test_stats,
+        os.path.join(script_dir, "distribution_water.png")
+    )
+    
+    # Visualizer.plot_channel_distributions(
+    #     train_data, val_data, test_data,
+    #     os.path.join(script_dir, "distribution_channel.png")
+    # )
     
     # Print statistics
     DataAnalyzer.print_dataset_stats(train_stats, "Training")
@@ -250,6 +357,7 @@ def main():
     
     print(f"\nSelected training image indices: {train_indices}")
     print(f"Selected validation image indices: {val_indices}")
+    print(f"Selected testing image indices: {test_indices}")
 
 if __name__ == "__main__":
     main()

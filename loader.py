@@ -30,34 +30,37 @@ def dataset_normalized(imgs):
 class isic_loader(Dataset):
     """ dataset class for Brats datasets
     """
-    def __init__(self, path_Data, train = True, Test = False):
+    def __init__(self, path_Data, train = True, Test = False, logger = None):
         super(isic_loader, self)
         self.train = train
-        print("\nStart reading data from", path_Data)
+        log_info = logger.info if logger else print
+        
+        log_info("Start reading data from " + path_Data)
 
         if train:
-            self.data   = np.load(path_Data+'data_train.npy')
-            self.mask   = np.load(path_Data+'mask_train.npy')
-            print("Training data statistics:")
-            print(f"Range: {self.data.min():.3f} to {self.data.max():.3f}")
-            print(f"Mean: {self.data.mean():.3f}")
-            print(f"Std: {self.data.std():.3f}")            
+            self.data = np.load(path_Data+'data_train.npy')
+            self.mask = np.load(path_Data+'mask_train.npy')
+            log_info("Training data statistics:")
+            log_info(f"Range: {self.data.min():.3f} to {self.data.max():.3f}")
+            log_info(f"Mean: {self.data.mean():.3f}")
+            log_info(f"Std: {self.data.std():.3f}")                  
         
         else:
           if Test:
-            self.data   = np.load(path_Data+'data_test.npy')
-            self.mask   = np.load(path_Data+'mask_test.npy')
+            self.data = np.load(path_Data+'data_test.npy')
+            self.mask = np.load(path_Data+'mask_test.npy')
           else:
-            self.data   = np.load(path_Data+'data_val.npy')
-            self.mask   = np.load(path_Data+'mask_val.npy')          
+            self.data = np.load(path_Data+'data_val.npy')
+            self.mask = np.load(path_Data+'mask_val.npy')          
         
-        print(f"Mode train = {train}", f"shape = {self.data.shape}")
-        self.data   = dataset_normalized(self.data)
-        print(f"Image Range after normalization: {self.data.min():.3f} to {self.data.max():.3f}")
+        log_info(f"Mode train = {train}, shape = {self.data.shape}")
+        print(f"Mode train = {train}, shape = {self.data.shape}")
+        self.data = dataset_normalized(self.data)
+        log_info(f"Image Range after normalization: {self.data.min():.3f} to {self.data.max():.3f}")
         
-        self.mask   = np.expand_dims(self.mask, axis=3)
-        self.mask   = self.mask/255.
-        print(f"Mask Unique values: {np.unique(self.mask)}")
+        self.mask = np.expand_dims(self.mask, axis=3)
+        self.mask = self.mask/255.
+        log_info(f"Mask Unique values: {np.unique(self.mask)}")
 
     def __getitem__(self, indx):
         img = self.data[indx]

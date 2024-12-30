@@ -21,14 +21,18 @@ warnings.filterwarnings("ignore")
 def main(config):
 
     print('#----------Creating logger----------#')
+    # resume_model = 'results/20241230_083403_UltraLight_VM_UNet_DIP/checkpoints/best.pth' # 16, 0.5
+    resume_model = 'results/20241230_095745_UltraLight_VM_UNet_DIP/checkpoints/best.pth'
+    config.work_dir = os.path.dirname(os.path.dirname(resume_model))
     sys.path.append(config.work_dir + '/')
     log_dir = os.path.join(config.work_dir, 'log')
-    checkpoint_dir = os.path.join(config.work_dir, 'checkpoints')
+    # checkpoint_dir = os.path.join(config.work_dir, 'checkpoints')
     # resume_model = os.path.join('')
-    resume_model = 'results/20241219_1111_UltraLight_VM_UNet_DIP/checkpoints/best-epoch68-loss1.0049.pth'
     outputs = os.path.join(config.work_dir, 'outputs')
-    if not os.path.exists(checkpoint_dir):
-        os.makedirs(checkpoint_dir)
+    print(f"output path: {outputs}\n")
+    
+    # if not os.path.exists(checkpoint_dir):
+    #     os.makedirs(checkpoint_dir)
     if not os.path.exists(outputs):
         os.makedirs(outputs)
 
@@ -40,7 +44,7 @@ def main(config):
     logger.info('='*50)
     logger.info('Testing Configuration:')
     logger.info(f'Resume Model Path: {resume_model}')
-    logger.info(f'Testing with checkpoint: best-epoch68-loss1.0049.pth')
+    logger.info(f'Testing with checkpoint: {resume_model.split("/")[-1]}')
     logger.info('='*50)
 
 
@@ -76,7 +80,6 @@ def main(config):
     optimizer = get_optimizer(config, model)
     scheduler = get_scheduler(config, optimizer)
     scaler = GradScaler()
-
 
 
 

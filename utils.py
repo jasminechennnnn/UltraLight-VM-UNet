@@ -239,7 +239,7 @@ def save_imgs(img, msk, msk_pred, i, save_path, datasets, threshold=0.5, test_da
 
     plt.subplot(3,1,2)
     plt.imshow(msk, cmap= 'gray')
-    plt.axis('off')
+    plt.axis('off') 
 
     plt.subplot(3,1,3)
     plt.imshow(msk_pred, cmap = 'gray')
@@ -247,8 +247,10 @@ def save_imgs(img, msk, msk_pred, i, save_path, datasets, threshold=0.5, test_da
 
     if test_data_name is not None:
         save_path = save_path + test_data_name + '_'
-    plt.savefig(save_path + str(i) +'.png')
+    plt.savefig(save_path + '/' + str(i) +'.png')
     plt.close()
+
+    # print(f"{save_path + '/' + str(i) +'.png'} saved!")
 
 def visualize_test_results(img, mask, pred, threshold=0.5, figsize=(15, 5)):
     """
@@ -367,6 +369,26 @@ class BceDiceLoss(nn.Module):
         loss = self.wd * diceloss + self.wb * bceloss
         return loss
 
+
+class IoULoss(nn.Module):
+    def __init__(self, smooth=1e-6):
+        """
+        :param smooth: 平滑項，防止分母為 0
+        """
+        super(IoULoss, self).__init__()
+        self.smooth = smooth
+
+    def forward(self, pred, target):
+        pred = pred.view(pred.size(0), -1)
+        target = target.view(target.size(0), -1)
+
+        intersection = (pred * target).sum(1)
+        union = pred.sum(1) + target.sum(1) - intersection
+        
+        iou = (intersection + self.smooth) / (union + self.smooth)
+        iou_loss = 1 - iou.mean()
+        return iou_loss
+    
 
 from thop import profile		 ## 导入thop模块
 def cal_params_flops(model, size, logger):
