@@ -46,7 +46,12 @@ chmod +x prepare_data.sh
 2. Preprocess and augment data:
 ```bash
 python dataprepare/aug_mix.py --num-augment <number>  # Replace <number> with desired augmentation count
+# also provide mild/strong augmenting options
 ```
+
+Other prepreocessing optons:  
+(1) `aug_new_channel.py`: Add precomputed features as additional channels  
+(2) `aug_adv.py`: Allow ignoring too complex samples; allow adjusting augmentation count based on each sample's importance
 
 ## 2. Training
 Train the UltraLight VM-UNet:

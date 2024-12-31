@@ -25,7 +25,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument('--shuffle', type=int, default=0,
                        help='Shuffle before splitting?')
     parser.add_argument('--con-th', type=float, default=0.75,
-                       help='Conplexity threshold')
+                       help='Complexity threshold')
     return parser.parse_args()
 
 def load_and_preprocess_image(image_path: str, size: Tuple[int, int]) -> np.ndarray:
